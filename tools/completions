@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+
+require 'rip'
+
+# puts "ARGV: #{ARGV.join(', ')} |"
+
+ARGS = ARGV.dup
+ARGS.reject! { |arg| arg =~ /^\s*$/ }
+ARGS.reject! { |arg| arg == 'rip' }
+
+ENV_LIST = Dir.glob(File.join(Rip.dir, '*')).map do |env|
+  env.split('/').last
+end.inject({}) { |res, env| res[env] = nil; res }
+
+# This is kind of hacky. Ideally, we could generate this from
+# the command documentation DSL.
+ENV_TREE = Rip::Env.commands.inject({}) do |tree, command|
+  tree[command] = Rip::Env.method(command).arity == 0 ? nil : ENV_LIST
+  tree
+end
+
+COMMAND_TREE = {
+  'env'        => ENV_TREE,
+  'freeze'     => nil,
+  'ruby'       => nil,
+  'install'    => nil,
+  'uninstall'  => nil,
+  'build'      => nil,
+  'check'      => nil,
+  'setup'      => nil,
+  'list'       => nil
+}
+
+STDERR.puts(ARGV.inspect)
+
+if ARGS.empty?
+  puts COMMAND_TREE.keys
+  exit
+end
+
+$WORKING_TREE = COMMAND_TREE
+
+while tree = COMMAND_TREE[ARGS.last]
+  ARGS.pop
+  $WORKING_TREE.replace(tree)
+end
+
+if arg = ARGS.pop
+  $WORKING_TREE.each do |key, val|
+    if arg == key[0..(arg.size-1)]
+      puts key
+    end
+  end
+else
+  puts $WORKING_TREE.keys
+end
+
+exit
